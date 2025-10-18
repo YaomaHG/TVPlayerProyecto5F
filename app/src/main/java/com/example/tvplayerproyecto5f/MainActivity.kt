@@ -9,6 +9,7 @@ import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.edit
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
@@ -21,7 +22,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
-data class Channel(val name: String, val url: String, val logo: String = "")
+data class Channel(val name: String, val url: String, val logo: String)
 
 class MainActivity : AppCompatActivity() {
 
@@ -33,13 +34,18 @@ class MainActivity : AppCompatActivity() {
     private val channels = mutableListOf<Channel>()
     private var editingChannel: Channel? = null
 
+    private val sharedPreferences by lazy {
+        getSharedPreferences("channels", Context.MODE_PRIVATE)
+    }
+
     private val addChannelResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
+        if (result.resultCode == RESULT_OK) {
             val data: Intent? = result.data
             val channelName = data?.getStringExtra("channel_name")
             val channelUrl = data?.getStringExtra("channel_url")
-            if (channelName != null && channelUrl != null) {
-                val newChannel = Channel(channelName, channelUrl)
+            val channelLogo = data?.getStringExtra("channel_logo")
+            if (channelName != null && channelUrl != null && channelLogo != null) {
+                val newChannel = Channel(channelName, channelUrl, channelLogo)
                 channels.add(newChannel)
                 channelList.adapter?.notifyItemInserted(channels.size - 1)
                 saveChannels()
@@ -48,14 +54,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val editChannelResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
+        if (result.resultCode == RESULT_OK) {
             val data: Intent? = result.data
             val channelName = data?.getStringExtra("channel_name")
             val channelUrl = data?.getStringExtra("channel_url")
-            if (channelName != null && channelUrl != null && editingChannel != null) {
+            val channelLogo = data?.getStringExtra("channel_logo")
+            if (channelName != null && channelUrl != null && channelLogo != null && editingChannel != null) {
                 val index = channels.indexOf(editingChannel)
                 if (index != -1) {
-                    val updatedChannel = Channel(channelName, channelUrl)
+                    val updatedChannel = Channel(channelName, channelUrl, channelLogo)
                     channels[index] = updatedChannel
                     channelList.adapter?.notifyItemChanged(index)
                     saveChannels()
@@ -105,7 +112,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun initializeChannelList() {
         channelList.layoutManager = LinearLayoutManager(this)
-        val adapter = ChannelAdapter(channels, 
+        val adapter = ChannelAdapter(channels,
             { channel -> // onChannelClick
                 playChannel(channel)
             },
@@ -142,6 +149,7 @@ class MainActivity : AppCompatActivity() {
                     val intent = Intent(this, AddEditChannelActivity::class.java)
                     intent.putExtra("channel_name", channel.name)
                     intent.putExtra("channel_url", channel.url)
+                    intent.putExtra("channel_logo", channel.logo)
                     editChannelResultLauncher.launch(intent)
                 }
                 "Delete" -> {
@@ -159,32 +167,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveChannels() {
-        val sharedPreferences = getSharedPreferences("channels", Context.MODE_PRIVATE)
-        val editor = sharedPreferences.edit()
         val gson = Gson()
         val json = gson.toJson(channels)
-        editor.putString("channel_list", json)
-        editor.apply()
+        sharedPreferences.edit {
+            putString("channel_list", json)
+        }
     }
 
     private fun loadChannels() {
         try {
-            val sharedPreferences = getSharedPreferences("channels", Context.MODE_PRIVATE)
-            val gson = Gson()
-            val json = sharedPreferences.getString("channel_list", null)
-            if (json != null) {
+            sharedPreferences.getString("channel_list", null)?.let { json ->
                 val type = object : TypeToken<MutableList<Channel>>() {}.type
-                val channelList: MutableList<Channel>? = gson.fromJson(json, type)
-                if (channelList != null) {
+                val loadedChannels: List<Channel>? = Gson().fromJson(json, type)
+                loadedChannels?.let {
                     channels.clear()
-                    channels.addAll(channelList)
+                    channels.addAll(it)
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(this, "Error loading channels. Resetting.", Toast.LENGTH_LONG).show()
             // Clear corrupted data
-            getSharedPreferences("channels", Context.MODE_PRIVATE).edit().clear().apply()
+            sharedPreferences.edit { clear() }
             channels.clear()
         }
     }

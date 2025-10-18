@@ -17,6 +17,12 @@
         android:layout_height="wrap_content"
         android:hint="Channel URL" />
 
+    <EditText
+        android:id="@+id/channel_logo_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Channel Logo URL" />
+
     <Button
         android:id="@+id/save_channel_button"
         android:layout_width="wrap_content"

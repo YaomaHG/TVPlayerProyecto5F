@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 
 class ChannelAdapter(
     private val channels: List<Channel>,
@@ -36,7 +37,10 @@ class ChannelAdapter(
 
         fun bind(channel: Channel) {
             channelName.text = channel.name
-            // Here you can load the channel logo using a library like Glide or Picasso
+            Glide.with(itemView.context)
+                .load(channel.logo)
+                .placeholder(R.mipmap.ic_launcher)
+                .into(channelLogo)
         }
     }
 }
